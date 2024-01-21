@@ -10,7 +10,7 @@ export default async function createClient(
     logger?: IZooLockLogger;
   },
 ): Promise<zoolockDir> {
-  const logger = addZooLockLogger(console);
+  const logger = addZooLockLogger(options?.logger);
   const client = zookeeper.createClient(connectionString, options);
   client.connect();
   return await new Promise((res) => {
