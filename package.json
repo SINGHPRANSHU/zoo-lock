@@ -1,6 +1,6 @@
 {
   "name": "zoo-lock",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "nodejs client for locking mechanism in zookeeper",
   "main": "build/index.js",
   "types": "build/index.d.ts",

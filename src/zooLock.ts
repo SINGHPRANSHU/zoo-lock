@@ -14,10 +14,16 @@ export class ZooLock {
   public async lock(path: string): Promise<ZooUnlock> {
     await this.createDir();
     const lockedPath = await this.createChild(this.dir + path);
-    this.path = path;
-    this.key = lockedPath.replace(`${path}/`, "");
-    await this.checkForLock(path, lockedPath);
-    return new ZooUnlock(this.client, lockedPath, this.logger);
+    const zoounlock = new ZooUnlock(this.client, lockedPath, this.logger);
+    try {
+      this.path = path;
+      this.key = lockedPath.replace(`${path}/`, "");
+      await this.checkForLock(path, lockedPath);
+    } catch (error) {
+      await zoounlock.release();
+      throw error;
+    }
+    return zoounlock;
   }
 
   async getChildren(path: string): Promise<string[]> {
