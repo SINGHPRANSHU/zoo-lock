@@ -9,10 +9,6 @@ export class ZooLockClient {
     private logger: ZooLockLogger,
   ) {}
 
-  public getClient(): Client {
-    return this.client;
-  }
-
   async getZooLock(path: string) {
     return await new ZooLock(this.client, this.dir, this.logger).lock(path);
   }
