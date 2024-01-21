@@ -8,6 +8,10 @@ export class zoolockDir {
     private logger: ZooLockLogger,
   ) {}
 
+  public getClient(): Client {
+    return this.client;
+  }
+
   setDir(dir: string): ZooLockClient {
     return new ZooLockClient(this.client, dir, this.logger);
   }
