@@ -1,9 +1,10 @@
 {
   "name": "zoo-lock",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "nodejs client for locking mechanism in zookeeper",
   "main": "build/index.js",
   "types": "build/index.d.ts",
+  "repository": "https://github.com/SINGHPRANSHU/zoo-lock.git",
   "keywords": [
     "zookeeper",
     "zookeeper lock",
@@ -17,7 +18,7 @@
     "build": "npm run lint && npm run compile",
     "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\"",
     "lint": "eslint src --ext .ts",
-    "prepublish": "npm run build"
+    "prepublishOnly": "npm run build"
   },
   "author": "Pranshu Singh",
   "license": "MIT",

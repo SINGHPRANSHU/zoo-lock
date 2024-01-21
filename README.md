@@ -10,9 +10,18 @@ Locks must be released with the `release` method return while applying lock.
 
 
 ## ZookeeperLock
+
+### install
+usage: 
+```
+  npm i zoo-lock
+```
+
 ### constructor
 usage: 
 ```
+  import createClient from "zoo-lock";
+
   const client = await createClient("localhost:2181", {
     logger: console,
   });
@@ -20,12 +29,10 @@ usage:
 ```
 
 
-
-
-#### lock and unlock
+### lock and unlock
 usage:
 ```
-	const zooUnLock = await client
+    const zooUnLock = await client
       .setDir("/test2")
       .getZooLock("/mylock")
 
