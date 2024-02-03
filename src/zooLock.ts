@@ -2,6 +2,10 @@ import { CreateMode, type Client } from "node-zookeeper-client";
 import { ZooUnlock } from "./zooUnlock";
 import { ZooLockLogger } from "./helper/zooLockLogger";
 
+export type ZooLockOption = {
+  timeout?: number;
+};
+
 export class ZooLock {
   key: string | undefined;
   path: string | undefined;
@@ -9,21 +13,49 @@ export class ZooLock {
     private readonly client: Client,
     private dir: string,
     private logger: ZooLockLogger,
+    private options: ZooLockOption,
   ) {}
 
   public async lock(path: string): Promise<ZooUnlock> {
     await this.createDir();
     const lockedPath = await this.createChild(this.dir + path);
     const zoounlock = new ZooUnlock(this.client, lockedPath, this.logger);
+    await this.checkLockTimeout(lockedPath, zoounlock); // this will run async and check for timeout for lock held by node
     try {
       this.path = path;
       this.key = lockedPath.replace(`${path}/`, "");
       await this.checkForLock(path, lockedPath);
     } catch (error) {
-      await zoounlock.release();
-      throw error;
+      !zoounlock.isLockedTimedOut() && (await zoounlock.release()); // if lock isalready released by timeout then no need to release it again
+      if (zoounlock.isLockedTimedOut()) {
+        throw new Error(`locked timedout for ${lockedPath} node`);
+      } else {
+        throw error;
+      }
     }
     return zoounlock;
+  }
+
+  private async checkLockTimeout(lockedPath: string, zoounlock: ZooUnlock) {
+    if (this.options.timeout) {
+      const lockTimeout = await this.setTimeoutPromise(() =>
+        zoounlock.timeoutRelease(),
+      );
+      zoounlock.setTimeout(lockTimeout);
+    }
+  }
+
+  private setTimeoutPromise<T>(
+    callback: () => Promise<T>,
+  ): Promise<NodeJS.Timeout> {
+    return new Promise((res) => {
+      const timeout = setTimeout(() => {
+        callback().catch((err) =>
+          this.logger.info("something went wrong while releasing lock", err),
+        );
+      }, this.options.timeout);
+      res(timeout);
+    });
   }
 
   async getChildren(path: string): Promise<string[]> {
@@ -60,10 +92,13 @@ export class ZooLock {
     await new Promise((res, rej) => {
       this.client.exists(
         this.dir + "/" + children[currIndex - 1],
-        async (event) => {
+        (event) => {
           this.logger.info(event);
-          await this.checkForLock(path, lockedPath);
-          res(true);
+          this.checkForLock(path, lockedPath)
+            .then(() => res(true))
+            .catch(() => {
+              rej(false);
+            });
         },
         (err) => {
           if (err) {
