@@ -18,7 +18,7 @@
     "build": "rimraf build && npm run lint && npm run compile",
     "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\"",
     "lint": "eslint src --ext .ts",
-    "prepublishOnly": "npm i && npm run build"
+    "prepublishOnly": "npm i && npm run test && npm run build"
   },
   "author": "Pranshu Singh",
   "license": "MIT",
