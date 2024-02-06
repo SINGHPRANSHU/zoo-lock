@@ -59,7 +59,7 @@ export class ZooLock {
   }
 
   async getChildren(path: string): Promise<string[]> {
-    return await new Promise((res, rej) => {
+    return new Promise((res, rej) => {
       this.client.getChildren(this.dir, (err, children) => {
         if (err || children.length === 0) {
           return rej(err || "children not set");
@@ -79,19 +79,14 @@ export class ZooLock {
 
   async watchChild(
     path: string,
-    children: string[],
+    prevChild: string,
     currIndex: number,
     lockedPath: string,
   ) {
-    this.logger.info(
-      "watching for",
-      "/" + children[currIndex - 1],
-      "by",
-      lockedPath,
-    );
+    this.logger.info("watching for", "/" + prevChild, "by", lockedPath);
     await new Promise((res, rej) => {
       this.client.exists(
-        this.dir + "/" + children[currIndex - 1],
+        this.dir + "/" + prevChild,
         (event) => {
           this.logger.info(event);
           this.checkForLock(path, lockedPath)
@@ -104,7 +99,7 @@ export class ZooLock {
           if (err) {
             this.logger.error(
               "error while watching node",
-              this.dir + "/" + children[currIndex - 1],
+              this.dir + "/" + prevChild,
               "by",
               lockedPath,
             );
@@ -143,7 +138,12 @@ export class ZooLock {
     } else if (childExist === 0) {
       this.logger.info("lock acquired by", lockedPath);
     } else {
-      await this.watchChild(path, children, childExist, lockedPath);
+      await this.watchChild(
+        path,
+        children[childExist - 1],
+        childExist,
+        lockedPath,
+      );
     }
   }
 
