@@ -4,6 +4,7 @@ import { ZooLockLogger } from "./helper/zooLockLogger";
 
 export type ZooLockOption = {
   timeout?: number;
+  maxChildLockLimit?: number;
 };
 
 export class ZooLock {
@@ -37,7 +38,7 @@ export class ZooLock {
   }
 
   private async checkLockTimeout(lockedPath: string, zoounlock: ZooUnlock) {
-    if (this.options.timeout) {
+    if (this.options.timeout && this.options.timeout > 0) {
       const lockTimeout = await this.setTimeoutPromise(() =>
         zoounlock.timeoutRelease(),
       );
@@ -58,21 +59,13 @@ export class ZooLock {
     });
   }
 
-  async getChildren(path: string): Promise<string[]> {
+  async getChildren(): Promise<string[]> {
     return new Promise((res, rej) => {
       this.client.getChildren(this.dir, (err, children) => {
         if (err || children.length === 0) {
-          return rej(err || "children not set");
+          return rej(err || new Error("children not set"));
         }
-
-        const filteredChildren = children
-          .filter((child) => child !== null && ("/" + child).startsWith(path))
-          .sort((a, b) => {
-            const first = a.replace(path.replace("/", ""), "");
-            const second = b.replace(path.replace("/", ""), "");
-            return parseInt(first) - parseInt(second);
-          });
-        res(filteredChildren);
+        res(children);
       });
     });
   }
@@ -92,7 +85,7 @@ export class ZooLock {
           this.checkForLock(path, lockedPath)
             .then(() => res(true))
             .catch(() => {
-              rej(false);
+              rej(new Error("something went wrong while watch"));
             });
         },
         (err) => {
@@ -112,7 +105,18 @@ export class ZooLock {
 
   async createChild(path: string): Promise<string> {
     this.logger.info("child created at dir", this.dir, path);
-
+    if (this.options.maxChildLockLimit && this.options.maxChildLockLimit > 0) {
+      try {
+        const children = await this.getChildren();
+        if (children.length >= this.options.maxChildLockLimit) {
+          throw new Error("max child lock limit reached");
+        }
+      } catch (error) {
+        if ((error as Error).message !== "children not set") {
+          throw error;
+        }
+      }
+    }
     return new Promise((res, rej) => {
       this.client.create(
         path,
@@ -128,8 +132,15 @@ export class ZooLock {
   }
 
   async checkForLock(path: string, lockedPath: string) {
-    const children = await this.getChildren(path);
-    const childExist = children.findIndex(
+    const children = await this.getChildren();
+    const filteredChildren = children
+      .filter((child) => child !== null && ("/" + child).startsWith(path))
+      .sort((a, b) => {
+        const first = a.replace(path.replace("/", ""), "");
+        const second = b.replace(path.replace("/", ""), "");
+        return parseInt(first) - parseInt(second);
+      });
+    const childExist = filteredChildren.findIndex(
       (child) => this.dir + "/" + child === lockedPath,
     );
 
@@ -140,7 +151,7 @@ export class ZooLock {
     } else {
       await this.watchChild(
         path,
-        children[childExist - 1],
+        filteredChildren[childExist - 1],
         childExist,
         lockedPath,
       );
