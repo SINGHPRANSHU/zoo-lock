@@ -133,28 +133,51 @@ export class ZooLock {
 
   async checkForLock(path: string, lockedPath: string) {
     const children = await this.getChildren();
-    const filteredChildren = children
-      .filter((child) => child !== null && ("/" + child).startsWith(path))
-      .sort((a, b) => {
-        const first = a.replace(path.replace("/", ""), "");
-        const second = b.replace(path.replace("/", ""), "");
-        return parseInt(first) - parseInt(second);
-      });
-    const childExist = filteredChildren.findIndex(
-      (child) => this.dir + "/" + child === lockedPath,
+    const filteredChildren = children.filter(
+      (child) => child !== null && ("/" + child).startsWith(path),
     );
+    // .sort((a, b) => {
+    //   const first = a.replace(path.replace("/", ""), "");
+    //   const second = b.replace(path.replace("/", ""), "");
+    //   return parseInt(first) - parseInt(second);
+    // });
 
+    let childExist = -1;
+    const currentNodeSequence = lockedPath.replace(this.dir + "/", "");
+    const currentNodeSequenceNumber = lockedPath.replace(this.dir + path, "");
+    const nextPrevChild = filteredChildren.reduce((prev, curr) => {
+      const currentNode = curr.replace(path.replace("/", ""), "");
+      const previousNode = prev.replace(path.replace("/", ""), "");
+      if (this.dir + "/" + curr === lockedPath) {
+        childExist = 1;
+      }
+      if (
+        parseInt(previousNode) === parseInt(currentNodeSequenceNumber) &&
+        parseInt(previousNode) > parseInt(currentNode)
+      ) {
+        return curr;
+      } else if (
+        parseInt(previousNode) < parseInt(currentNode) &&
+        parseInt(currentNodeSequenceNumber) > parseInt(currentNode)
+      ) {
+        return curr;
+      } else {
+        return prev;
+      }
+    }, currentNodeSequence);
+
+    if (this.dir + "/" + nextPrevChild === lockedPath) {
+      childExist = 0;
+    }
+    // const childExist = filteredChildren.findIndex(
+    //   (child) => this.dir + "/" + child === lockedPath,
+    // );
     if (childExist === -1) {
       throw new Error("child does not exist");
     } else if (childExist === 0) {
       this.logger.info("lock acquired by", lockedPath);
     } else {
-      await this.watchChild(
-        path,
-        filteredChildren[childExist - 1],
-        childExist,
-        lockedPath,
-      );
+      await this.watchChild(path, nextPrevChild, childExist, lockedPath);
     }
   }
 

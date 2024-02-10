@@ -79,7 +79,7 @@ usage:
 ```
     const zooUnLock = await client
       .setDir("/test")
-      .getZooLock("/mylock", { MaxChildLockLimit: 2 })   // will throw error if directory already has 2 nodes
+      .getZooLock("/mylock", { maxChildLockLimit: 2 })   // will throw error if directory already has 2 nodes
 
     await zooUnLock.release();
 ```
