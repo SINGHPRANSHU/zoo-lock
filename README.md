@@ -73,7 +73,9 @@ usage:
 ### MaxChildLockLimit
 MaxChildLockLimit can be set for locks through ZooLockOption where MaxChildLockLimit represent max number of lock a directory can hold.
 
-NOTE: There can be more locks than limit if two parallel requests tries to create locks, but it is still good to have this options while applying locks.
+Lock limit can exceed -
+1. before creating node
+2. after creating node
 
 usage:
 ```

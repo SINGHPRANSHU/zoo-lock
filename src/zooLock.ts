@@ -109,7 +109,7 @@ export class ZooLock {
       try {
         const children = await this.getChildren();
         if (children.length >= this.options.maxChildLockLimit) {
-          throw new Error("max child lock limit reached");
+          throw new Error("max child lock limit reached before creating node");
         }
       } catch (error) {
         if ((error as Error).message !== "children not set") {
@@ -143,6 +143,7 @@ export class ZooLock {
     // });
 
     let childExist = -1;
+    let totalLocksHeld = 0;
     const currentNodeSequence = lockedPath.replace(this.dir + "/", "");
     const currentNodeSequenceNumber = lockedPath.replace(this.dir + path, "");
     const nextPrevChild = filteredChildren.reduce((prev, curr) => {
@@ -150,6 +151,9 @@ export class ZooLock {
       const previousNode = prev.replace(path.replace("/", ""), "");
       if (this.dir + "/" + curr === lockedPath) {
         childExist = 1;
+      }
+      if (parseInt(currentNode) < parseInt(currentNodeSequenceNumber)) {
+        totalLocksHeld++;
       }
       if (
         parseInt(previousNode) === parseInt(currentNodeSequenceNumber) &&
@@ -168,6 +172,14 @@ export class ZooLock {
 
     if (this.dir + "/" + nextPrevChild === lockedPath) {
       childExist = 0;
+    }
+
+    if (
+      this.options.maxChildLockLimit &&
+      this.options.maxChildLockLimit > 0 &&
+      totalLocksHeld >= this.options.maxChildLockLimit
+    ) {
+      throw new Error("max child lock limit reached after creating node");
     }
     // const childExist = filteredChildren.findIndex(
     //   (child) => this.dir + "/" + child === lockedPath,

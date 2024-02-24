@@ -11,12 +11,20 @@ async function main(client: zoolockDir, options: ZooLockOption, dir: string) {
       unlock
         .release()
         .then(() => res(true))
-        .catch(() => {
+        .catch(() => {                    
           rej(false);
         });
     }, 2000);
   });
 }
+
+test("should throw error due to wrong node name", async () => {
+  const client = await createClient(ZooKeeperUrl);
+  const zookeeperClient = client.getClient();
+  await expect(main(client, {timeout: 1000}, "test"))
+    .rejects.toEqual(new Error('dir should start with /'))
+    .finally(() => zookeeperClient.close());
+});
 
 test("should throw error due to timeout", async () => {
   const client = await createClient(ZooKeeperUrl);
@@ -86,5 +94,22 @@ test("two out of two lock should throw error due to max lock limit", async () =>
   expect(res1.status).toEqual("rejected");
   expect(res2.status).toEqual("rejected");
   await initialLock
+  zookeeperClient.close();
+});
+test("one out of two lock should throw error due to max lock limit", async () => {
+  const client = await createClient(ZooKeeperUrl);
+  const zookeeperClient = client.getClient();
+  // const initialLock = main(client, {}, "/test");
+  const [res1, res2] = await Promise.allSettled([
+    new Promise((res, rej) => setTimeout(() => {
+      main(client, {maxChildLockLimit: 1}, "/test").then(() => res(true)).catch((err) => rej(err))
+    }, 500)),
+    new Promise((res, rej) => setTimeout(() => {
+      main(client, {maxChildLockLimit: 1}, "/test").then(() => res(true)).catch((err) => rej(err))
+    }, 500))
+  ]);    
+  expect(res1.status).toEqual("fulfilled");
+  expect(res2.status).toEqual("rejected");
+  // await initialLock
   zookeeperClient.close();
 });
