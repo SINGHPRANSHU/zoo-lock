@@ -34,7 +34,7 @@ usage:
 usage:
 ```
     const zooUnLock = await client
-      .setDir("/test2")
+      .setDir("/test")
       .getZooLock("/mylock")
 
     // perform some task
@@ -46,7 +46,7 @@ usage:
 
 ### Get Node-Zookeeper-Client Object
 
-if for some reason you need node-zookeeper-client object it is accessible through getClient method
+if for some reason you need node-zookeeper-client object, it is accessible through getClient method
 
 usage:
 ```
@@ -65,8 +65,23 @@ release method could also throw error if due to timeout node was already removed
 usage:
 ```
     const zooUnLock = await client
-      .setDir("/test2")
+      .setDir("/test")
       .getZooLock("/mylock", { timeout: 3000 })   // timeout in ms
+
+    await zooUnLock.release();
+```
+### MaxChildLockLimit
+MaxChildLockLimit can be set for locks through ZooLockOption where MaxChildLockLimit represent max number of lock a directory can hold.
+
+Lock limit can exceed -
+1. before creating node
+2. after creating node
+
+usage:
+```
+    const zooUnLock = await client
+      .setDir("/test")
+      .getZooLock("/mylock", { maxChildLockLimit: 2 })   // will throw error if directory already has 2 nodes
 
     await zooUnLock.release();
 ```

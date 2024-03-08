@@ -13,6 +13,9 @@ export class zoolockDir {
   }
 
   setDir(dir: string): ZooLockClient {
+    if (!dir.startsWith("/")) {
+      throw new Error("dir should start with /");
+    }
     return new ZooLockClient(this.client, dir, this.logger);
   }
 }

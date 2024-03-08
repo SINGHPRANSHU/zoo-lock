@@ -12,7 +12,6 @@ export class ZooUnlock {
 
   public async release() {
     this.logger.info("releasing lock", this.path);
-    clearTimeout(this.timeOut);
     await this.removeNode();
   }
 
@@ -22,6 +21,7 @@ export class ZooUnlock {
 
   public async timeoutRelease() {
     this.logger.error(`releasing node ${this.path} lock due to timeout`);
+    this.isTimedout = true;
     await this.removeNode();
   }
 
@@ -32,7 +32,6 @@ export class ZooUnlock {
           return rej(err);
         }
         clearTimeout(this.timeOut);
-        this.isTimedout = true;
         return res(true);
       });
     });

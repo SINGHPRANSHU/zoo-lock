@@ -4,6 +4,7 @@ import { ZooLockLogger } from "./helper/zooLockLogger";
 
 export type ZooLockOption = {
   timeout?: number;
+  maxChildLockLimit?: number;
 };
 
 export class ZooLock {
@@ -37,7 +38,7 @@ export class ZooLock {
   }
 
   private async checkLockTimeout(lockedPath: string, zoounlock: ZooUnlock) {
-    if (this.options.timeout) {
+    if (this.options.timeout && this.options.timeout > 0) {
       const lockTimeout = await this.setTimeoutPromise(() =>
         zoounlock.timeoutRelease(),
       );
@@ -58,21 +59,13 @@ export class ZooLock {
     });
   }
 
-  async getChildren(path: string): Promise<string[]> {
+  async getChildren(): Promise<string[]> {
     return new Promise((res, rej) => {
       this.client.getChildren(this.dir, (err, children) => {
         if (err || children.length === 0) {
-          return rej(err || "children not set");
+          return rej(err || new Error("children not set"));
         }
-
-        const filteredChildren = children
-          .filter((child) => child !== null && ("/" + child).startsWith(path))
-          .sort((a, b) => {
-            const first = a.replace(path.replace("/", ""), "");
-            const second = b.replace(path.replace("/", ""), "");
-            return parseInt(first) - parseInt(second);
-          });
-        res(filteredChildren);
+        res(children);
       });
     });
   }
@@ -92,7 +85,7 @@ export class ZooLock {
           this.checkForLock(path, lockedPath)
             .then(() => res(true))
             .catch(() => {
-              rej(false);
+              rej(new Error("something went wrong while watch"));
             });
         },
         (err) => {
@@ -112,7 +105,18 @@ export class ZooLock {
 
   async createChild(path: string): Promise<string> {
     this.logger.info("child created at dir", this.dir, path);
-
+    if (this.options.maxChildLockLimit && this.options.maxChildLockLimit > 0) {
+      try {
+        const children = await this.getChildren();
+        if (children.length >= this.options.maxChildLockLimit) {
+          throw new Error("max child lock limit reached before creating node");
+        }
+      } catch (error) {
+        if ((error as Error).message !== "children not set") {
+          throw error;
+        }
+      }
+    }
     return new Promise((res, rej) => {
       this.client.create(
         path,
@@ -128,22 +132,64 @@ export class ZooLock {
   }
 
   async checkForLock(path: string, lockedPath: string) {
-    const children = await this.getChildren(path);
-    const childExist = children.findIndex(
-      (child) => this.dir + "/" + child === lockedPath,
+    const children = await this.getChildren();
+    const filteredChildren = children.filter(
+      (child) => child !== null && ("/" + child).startsWith(path),
     );
+    // .sort((a, b) => {
+    //   const first = a.replace(path.replace("/", ""), "");
+    //   const second = b.replace(path.replace("/", ""), "");
+    //   return parseInt(first) - parseInt(second);
+    // });
 
+    let childExist = -1;
+    let totalLocksHeld = 0;
+    const currentNodeSequence = lockedPath.replace(this.dir + "/", "");
+    const currentNodeSequenceNumber = lockedPath.replace(this.dir + path, "");
+    const nextPrevChild = filteredChildren.reduce((prev, curr) => {
+      const currentNode = curr.replace(path.replace("/", ""), "");
+      const previousNode = prev.replace(path.replace("/", ""), "");
+      if (this.dir + "/" + curr === lockedPath) {
+        childExist = 1;
+      }
+      if (parseInt(currentNode) < parseInt(currentNodeSequenceNumber)) {
+        totalLocksHeld++;
+      }
+      if (
+        parseInt(previousNode) === parseInt(currentNodeSequenceNumber) &&
+        parseInt(previousNode) > parseInt(currentNode)
+      ) {
+        return curr;
+      } else if (
+        parseInt(previousNode) < parseInt(currentNode) &&
+        parseInt(currentNodeSequenceNumber) > parseInt(currentNode)
+      ) {
+        return curr;
+      } else {
+        return prev;
+      }
+    }, currentNodeSequence);
+
+    if (this.dir + "/" + nextPrevChild === lockedPath) {
+      childExist = 0;
+    }
+
+    if (
+      this.options.maxChildLockLimit &&
+      this.options.maxChildLockLimit > 0 &&
+      totalLocksHeld >= this.options.maxChildLockLimit
+    ) {
+      throw new Error("max child lock limit reached after creating node");
+    }
+    // const childExist = filteredChildren.findIndex(
+    //   (child) => this.dir + "/" + child === lockedPath,
+    // );
     if (childExist === -1) {
       throw new Error("child does not exist");
     } else if (childExist === 0) {
       this.logger.info("lock acquired by", lockedPath);
     } else {
-      await this.watchChild(
-        path,
-        children[childExist - 1],
-        childExist,
-        lockedPath,
-      );
+      await this.watchChild(path, nextPrevChild, childExist, lockedPath);
     }
   }
 
