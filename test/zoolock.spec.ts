@@ -1,5 +1,5 @@
 import createClient from "../src";
-import { ZooLockOption } from "../src/zooLock";
+import { CreateZooLockMode, ZooLockOption } from "../src/zooLock";
 import { zoolockDir } from "../src/zooLockDir";
 
 const ZooKeeperUrl = "localhost:2181";
@@ -110,6 +110,30 @@ test("one out of two lock should throw error due to max lock limit", async () =>
   ]);    
   expect(res1.status).toEqual("fulfilled");
   expect(res2.status).toEqual("rejected");
+  // await initialLock
+  zookeeperClient.close();
+});
+test("create lock for CreateZooLockMode EPHEMERAL", async () => {
+  const client = await createClient(ZooKeeperUrl);
+  const zookeeperClient = client.getClient();
+  // const initialLock = main(client, {}, "/test");
+  
+  const status = main(client, {maxChildLockLimit: 1}, "/test")
+      
+  expect(status).resolves.toEqual(true).finally(() => zookeeperClient.close());
+  ;
+});
+
+test("one out of two lock should throw error due to node exist for CreateZooLockMode EPHEMERAL", async () => {
+  const client = await createClient(ZooKeeperUrl);
+  const zookeeperClient = client.getClient();
+
+  const [res1, res2] = await Promise.allSettled([main(client, { createZooLockMode: CreateZooLockMode.EPHEMERAL }, "/test",), main(client, { createZooLockMode: CreateZooLockMode.EPHEMERAL }, "/test")])
+  
+  expect(res1.status).toEqual("fulfilled");
+  expect(res2.status).toEqual("rejected");
+  console.log(res2);
+  
   // await initialLock
   zookeeperClient.close();
 });

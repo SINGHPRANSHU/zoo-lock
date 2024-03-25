@@ -130,7 +130,6 @@ export class ZooLock {
         }
       }
     }
-    this.logger.info("child created at dir", this.dir, path);
     return new Promise((res, rej) => {
       this.client.create(
         path,
@@ -143,10 +142,16 @@ export class ZooLock {
               createZooLockMode === CreateZooLockMode.EPHEMERAL &&
               err.name === "NODE_EXISTS"
             ) {
-              rej(err.name);
+              rej(
+                "cannot create new node as " +
+                  err.name +
+                  " for CreateZooLockMode " +
+                  createZooLockMode,
+              );
             }
             return rej(err);
           }
+          this.logger.info("child created at dir", this.dir, path);
           res(lockedPath);
         },
       );
