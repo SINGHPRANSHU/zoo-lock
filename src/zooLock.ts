@@ -5,7 +5,15 @@ import { ZooLockLogger } from "./helper/zooLockLogger";
 export type ZooLockOption = {
   timeout?: number;
   maxChildLockLimit?: number;
+  createZooLockMode?: CreateZooLockMode;
 };
+
+export enum CreateZooLockMode {
+  PERSISTENT = "PERSISTENT",
+  PERSISTENT_SEQUENTIAL = "PERSISTENT_SEQUENTIAL",
+  EPHEMERAL = "EPHEMERAL",
+  EPHEMERAL_SEQUENTIAL = "EPHEMERAL_SEQUENTIAL",
+}
 
 export class ZooLock {
   key: string | undefined;
@@ -19,7 +27,10 @@ export class ZooLock {
 
   public async lock(path: string): Promise<ZooUnlock> {
     await this.createDir();
-    const lockedPath = await this.createChild(this.dir + path);
+    const lockedPath = await this.createChild(
+      this.dir + path,
+      this.options.createZooLockMode,
+    );
     const zoounlock = new ZooUnlock(this.client, lockedPath, this.logger);
     await this.checkLockTimeout(lockedPath, zoounlock); // this will run async and check for timeout for lock held by node
     try {
@@ -103,8 +114,10 @@ export class ZooLock {
     });
   }
 
-  async createChild(path: string): Promise<string> {
-    this.logger.info("child created at dir", this.dir, path);
+  async createChild(
+    path: string,
+    createZooLockMode?: CreateZooLockMode,
+  ): Promise<string> {
     if (this.options.maxChildLockLimit && this.options.maxChildLockLimit > 0) {
       try {
         const children = await this.getChildren();
@@ -117,12 +130,21 @@ export class ZooLock {
         }
       }
     }
+    this.logger.info("child created at dir", this.dir, path);
     return new Promise((res, rej) => {
       this.client.create(
         path,
-        CreateMode.EPHEMERAL_SEQUENTIAL,
+        createZooLockMode && CreateMode[createZooLockMode]
+          ? CreateMode[createZooLockMode]
+          : CreateMode.EPHEMERAL_SEQUENTIAL,
         (err, lockedPath) => {
           if (err) {
+            if (
+              createZooLockMode === CreateZooLockMode.EPHEMERAL &&
+              err.name === "NODE_EXISTS"
+            ) {
+              rej(err.name);
+            }
             return rej(err);
           }
           res(lockedPath);
