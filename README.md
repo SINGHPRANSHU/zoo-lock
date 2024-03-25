@@ -86,6 +86,25 @@ usage:
     await zooUnLock.release();
 ```
 
+### CreateZooLockMode
+CreateMode can be set for locks through ZooLockOption through CreateZooLockMode option.
+
+values for CreateZooLockMode can be -
+1. PERSISTENT
+2. PERSISTENT_SEQUENTIAL
+3. EPHEMERAL
+4. EPHEMERAL_SEQUENTIAL  // default
+
+usage:
+```
+    const zooUnLock = await client
+      .setDir("/test")
+      .getZooLock("/mylock", { createZooLockMode: CreateZooLockMode.EPHEMERAL })   
+      // will throw error if directory has /mylock node
+
+    await zooUnLock.release();
+```
+
 ## Develop
 
 Build using `npm run build`.
