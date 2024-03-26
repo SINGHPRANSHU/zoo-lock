@@ -143,10 +143,12 @@ export class ZooLock {
               err.name === "NODE_EXISTS"
             ) {
               rej(
-                "cannot create new node as " +
-                  err.name +
-                  " for CreateZooLockMode " +
-                  createZooLockMode,
+                new Error(
+                  "cannot create new node as " +
+                    err.name +
+                    " for CreateZooLockMode " +
+                    createZooLockMode,
+                ),
               );
             }
             return rej(err);
